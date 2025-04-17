@@ -9,7 +9,7 @@ on:
 jobs:
   ci:
     name: Build & Lint Containers
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
 
     steps:
     - name: 🔄 Checkout source code
