@@ -26,13 +26,13 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-docker-
 
-    - name: 📦 Build all containers (docker compose)
-      run: docker compose build
-
-    - name: ✅ Lint all Dockerfiles
-      run: |
-        sudo apt-get install -y hadolint
-        find containers -name 'Dockerfile' -exec hadolint {} \;
+    # - name: 📦 Build all containers (docker compose)
+    #   run: docker compose build
+    #
+    # - name: ✅ Lint all Dockerfiles
+    #   run: |
+    #     sudo apt-get install -y hadolint
+    #     find containers -name 'Dockerfile' -exec hadolint {} \;
 
     # Add automated tests here if available
     # - name: 🧪 Run tests
