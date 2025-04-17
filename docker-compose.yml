@@ -1,0 +1,343 @@
+name: portfolio
+
+services:
+    webserver:
+        image: webserver:nginx
+        container_name: webserver
+        build:
+            context: ./services/webserver
+            dockerfile: ../../containers/webserver/Dockerfile
+        ports:
+            - 80:80/tcp
+            - 443:443/tcp
+        volumes:
+            - frontend-files:/www:ro
+            - shared-static-files:/app/media:rw
+        networks:
+            app-network:
+                aliases:
+                    - webserver
+        depends_on:
+            - frontend
+            - backend
+        security_opt:
+            - no-new-privileges:true
+        cap_drop:
+            - ALL
+        cap_add:
+            - NET_BIND_SERVICE
+        deploy:
+            resources:
+                limits:
+                    cpus: '0.50'
+                    memory: 256M
+                reservations:
+                    cpus: '0.25'
+                    memory: 128M
+        restart: always
+
+    frontend:
+        image: frontend:builder
+        container_name: frontend
+        build:
+            context: ./frontend
+            dockerfile: ../containers/frontend/Dockerfile
+        volumes:
+            - frontend-files:/www:cached
+        networks:
+            app-network:
+                aliases:
+                    - frontend
+        depends_on:
+            - backend
+        deploy:
+            resources:
+                limits:
+                    cpus: '0.50'
+                    memory: 256M
+                reservations:
+                    cpus: '0.25'
+                    memory: 128M
+        restart: always
+
+    backend:
+        image: backend:server
+        container_name: backend
+        build:
+            context: ./backend
+            dockerfile: ../containers/backend/Dockerfile
+        networks:
+            app-network:
+                aliases:
+                    - backend
+        volumes:
+            - shared-static-files:/app/media:rw
+        secrets:
+            - backend-credentials
+            - database-credentials
+            - mongo-credentials
+        depends_on:
+            database:
+                condition: service_healthy
+            mongoDB:
+                condition: service_healthy
+            vault:
+                condition: service_healthy
+        deploy:
+            resources:
+                limits:
+                    cpus: '0.75'
+                    memory: 512M
+                reservations:
+                    cpus: '0.50'
+                    memory: 256M
+        restart: always
+
+    database:
+        image: postgresql:database
+        container_name: database
+        build:
+            context: ./services/database
+            dockerfile: ../../containers/database/Dockerfile
+        volumes:
+            - db-data:/var/lib/postgresql/data
+        networks:
+            app-network:
+                aliases:
+                    - database
+                    - postgresql
+        secrets:
+            - database-credentials
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U admin -d appdb"]
+            interval: 15s
+            timeout: 10s
+            retries: 5
+            start_period: 50s
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+        deploy:
+            resources:
+                limits:
+                    cpus: '0.50'
+                    memory: 512M
+                reservations:
+                    cpus: '0.25'
+                    memory: 256M
+        restart: always
+
+    mongoDB:
+        image: mongodb:database
+        container_name: mongoDB
+        build:
+            context: ./services/mongoDB
+            dockerfile: ../../containers/mongoDB/Dockerfile
+        volumes:
+            - mongo-data:/data/db
+        networks:
+            app-network:
+                aliases:
+                    - mongodb
+        secrets:
+            - mongo-credentials
+        healthcheck:
+            test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+            interval: 10s
+            timeout: 5s
+            retries: 3
+            start_period: 30s
+        deploy:
+            resources:
+                limits:
+                    cpus: '0.50'
+                    memory: 512M
+                reservations:
+                    cpus: '0.25'
+                    memory: 256M
+        restart: always
+
+    vault:
+        image: vault:secrets
+        container_name: vault
+        build:
+            context: ./services/vault
+            dockerfile: ../../containers/vault/Dockerfile
+        cap_add:
+            - IPC_LOCK
+        networks:
+            app-network:
+                aliases:
+                    - vault
+        secrets:
+            - vault-credentials
+        volumes:
+            - vault-data:/vault/file
+        healthcheck:
+            test: ["CMD", "vault", "status"]
+            interval: 10s
+            timeout: 5s
+            retries: 3
+            start_period: 30s
+        deploy:
+            resources:
+                limits:
+                    cpus: '0.25'
+                    memory: 256M
+                reservations:
+                    cpus: '0.10'
+                    memory: 128M
+        restart: always
+
+    prometheus:
+        image: prometheus:monitoring
+        container_name: prometheus
+        build:
+            context: ./monitoring/prometheus
+            dockerfile: ../../containers/prometheus/Dockerfile
+        volumes:
+            - prometheus-data:/prometheus
+            - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+        networks:
+            app-network:
+                aliases:
+                    - prometheus
+        depends_on:
+            - node-exporter
+        deploy:
+            resources:
+                limits:
+                    cpus: '0.25'
+                    memory: 128M
+                reservations:
+                    cpus: '0.10'
+                    memory: 64M
+        restart: always
+
+    node-exporter:
+        image: node-exporter:monitoring
+        container_name: node-exporter
+        build:
+            context: ./monitoring/node-exporter
+            dockerfile: ../../containers/node-exporter/Dockerfile
+        volumes:
+            - /:/host:ro
+        networks:
+            app-network:
+                aliases:
+                    - node-exporter
+        deploy:
+            resources:
+                limits:
+                    cpus: '0.10'
+                    memory: 64M
+                reservations:
+                    cpus: '0.05'
+                    memory: 32M
+        restart: always
+
+    grafana:
+        image: grafana:monitoring
+        container_name: grafana
+        build:
+            context: ./monitoring/grafana
+            dockerfile: ../../containers/grafana/Dockerfile
+        volumes:
+            - grafana-data:/var/lib/grafana
+        networks:
+            app-network:
+                aliases:
+                    - grafana
+        depends_on:
+            - prometheus
+        deploy:
+            resources:
+                limits:
+                    cpus: '0.25'
+                    memory: 128M
+                reservations:
+                    cpus: '0.10'
+                    memory: 64M
+        restart: always
+
+    ansible:
+        image: ansible:infra
+        container_name: ansible
+        build:
+            context: ./infrastructure/ansible
+            dockerfile: ../../containers/ansible/Dockerfile
+        volumes:
+            - ./infrastructure/ansible:/ansible:cached
+        networks:
+            app-network:
+                aliases:
+                    - ansible
+        deploy:
+            resources:
+                limits:
+                    cpus: '0.25'
+                    memory: 256M
+                reservations:
+                    cpus: '0.10'
+                    memory: 128M
+        restart: always
+
+    terraform:
+        image: terraform:infra
+        container_name: terraform
+        build:
+            context: ./infrastructure/terraForm
+            dockerfile: ../../containers/terraForm/Dockerfile
+        volumes:
+            - ./infrastructure/terraForm:/terraform:cached
+        networks:
+            app-network:
+                aliases:
+                    - terraform
+        deploy:
+            resources:
+                limits:
+                    cpus: '0.25'
+                    memory: 256M
+                reservations:
+                    cpus: '0.10'
+                    memory: 128M
+        restart: always
+
+
+volumes:
+    db-data:
+        name: db-data
+    mongo-data:
+        name: mongo-data
+    vault-data:
+        name: vault-data
+    prometheus-data:
+        name: prometheus-data
+    grafana-data:
+        name: grafana-data
+    frontend-files:
+        name: frontend-files
+    shared-static-files:
+        name: shared-static-files
+
+
+networks:
+    app-network:
+        name: app-network
+        driver: bridge
+        driver_opts:
+            com.docker.network.driver.mtu: 1450
+
+
+secrets:
+    database-credentials:
+        file: ./secrets/database-credentials.env
+    mongo-credentials:
+        file: ./secrets/mongo-credentials.env
+    vault-credentials:
+        file: ./secrets/vault-credentials.env
+    backend-credentials:
+        file: ./secrets/backend-credentials.env
