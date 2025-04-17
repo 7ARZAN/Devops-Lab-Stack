@@ -9,7 +9,7 @@ on:
 jobs:
   ci:
     name: Build & Lint Containers
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
 
     steps:
     - name: 🔄 Checkout source code
@@ -26,8 +26,8 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-docker-
 
-    - name: 📦 Build all containers (docker-compose)
-      run: docker-compose build
+    - name: 📦 Build all containers (docker compose)
+      run: docker compose build
 
     - name: ✅ Lint all Dockerfiles
       run: |
@@ -36,6 +36,6 @@ jobs:
 
     # Add automated tests here if available
     # - name: 🧪 Run tests
-    #   run: docker-compose run --rm <test-service>
+    #   run: docker compose run --rm <test-service>
 
 
