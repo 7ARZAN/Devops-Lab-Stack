@@ -3,7 +3,7 @@ FROM		vault:1.17.6
 USER		root
 
 RUN		apk update && apk add --no-cache \
-		bash curl && rm -rf /var/cache/apk/*
+		bash curl && rm -rf /var/cache/apk/* 
 
 USER		vault
 
@@ -12,5 +12,4 @@ RUN		chmod 550 /launch.sh
 
 EXPOSE		8200/tcp
 
-ENTRYPOINT	["sh", "/launch.sh"]
-CMD		["server", "-dev"]
+ENTRYPOINT	["exec", "sh", "/launch.sh"]
