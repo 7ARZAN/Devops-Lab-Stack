@@ -1,15 +1,18 @@
-FROM		vault:1.17.6
+FROM		hashicorp/vault:1.17.6
 
 USER		root
 
-RUN		apk update && apk add --no-cache \
-		bash curl && rm -rf /var/cache/apk/* 
+RUN		apk update && apk add --no-cache jq \
+		bash curl && rm -rf /var/cache/apk/* && \
+		install -o vault -g vault -m 770 -d /vault/tokens 
+
+COPY		launch.sh /launch.sh
+COPY		bootstrap.sh /vault/bootstrap.sh
+
+RUN		install -o vault -g vault -m 550 /launch.sh /vault/bootstrap.sh
 
 USER		vault
 
-COPY		../../services/vault/launch.sh /launch.sh
-RUN		chmod 550 /launch.sh
-
 EXPOSE		8200/tcp
 
-ENTRYPOINT	["exec", "sh", "/launch.sh"]
+ENTRYPOINT	["sh", "/launch.sh"]

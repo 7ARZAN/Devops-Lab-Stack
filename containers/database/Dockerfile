@@ -1,7 +1,7 @@
 FROM		alpine:3.19
 
-COPY		../../services/database/setup.sh /setup.sh
-COPY		../../services/database/table-scheme.sql /etc/postgres/table-schema.sql
+COPY		setup.sh /setup.sh
+COPY		table-schema.sql /etc/postgres/table-schema.sql
 
 RUN		apk add --no-cache postgresql curl jq su-exec && \
 		install -do postgres -g postgres /var/lib/postgresql/data && \

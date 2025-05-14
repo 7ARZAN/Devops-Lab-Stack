@@ -20,8 +20,6 @@ if [ -z "$VAULT_TOKEN_ID" ]; then
     exit 1
 fi
 
-chmod 400 "$SECRETS_FILE"
-
 log "🔐 Starting Vault in dev mode with static root token..."
 
 vault server -dev \
@@ -31,13 +29,13 @@ vault server -dev \
 VAULT_PID=$!
 
 log "⏳ Waiting for Vault to be accessible..."
-sleep 3
+sleep 10
 
 export VAULT_ADDR="http://127.0.0.1:8200"
 export VAULT_TOKEN="$VAULT_TOKEN_ID"
 
 log "🔑 Logging in to Vault..."
-vault login "$VAULT_TOKEN_ID" > /dev/null
+echo "$VAULT_TOKEN_ID" | vault login - > /dev/null
 
 if [ -f "$PRELOAD_SCRIPT" ]; then
     log "📦 Found preload script. Running $PRELOAD_SCRIPT..."
